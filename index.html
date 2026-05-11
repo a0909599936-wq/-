@@ -9,14 +9,14 @@
 <body>
   <main class="game-wrap">
     <h1>Classic Snake</h1>
-    <p class="hint">方向鍵控制移動，吃到食物會變長，撞牆或撞到自己就結束。</p>
+    <p class="hint">使用 WASD 或方向鍵控制移動。吃到食物會加分，分數無上限；撞牆或撞到自己就結束。</p>
 
     <div class="info">
       <div>分數：<span id="score">0</span></div>
       <div>最高分：<span id="bestScore">0</span></div>
     </div>
 
-    <canvas id="game" width="400" height="400"></canvas>
+    <canvas id="game" width="400" height="400" tabindex="0"></canvas>
 
     <div class="controls">
       <button id="startBtn">開始遊戲</button>

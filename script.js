@@ -9,6 +9,7 @@ const restartBtn = document.getElementById("restartBtn");
 
 const gridSize = 20;
 const tileCount = canvas.width / gridSize;
+const maxSnakeLength = tileCount * tileCount - 1;
 const speed = 120;
 const bestScoreKey = "classic-snake-best-score";
 
@@ -22,6 +23,7 @@ let score;
 let gameLoop;
 let gameRunning;
 let gameOver;
+let directionQueue;
 
 function getBestScore() {
   return Number(localStorage.getItem(bestScoreKey)) || 0;
@@ -46,15 +48,19 @@ function resetGame() {
   score = 0;
   gameRunning = false;
   gameOver = false;
+  directionQueue = [];
 
   scoreEl.textContent = score;
   bestScoreEl.textContent = getBestScore();
   messageEl.textContent = "按「開始遊戲」開始";
 
+  directionQueue = [];
   draw();
 }
 
 function startGame() {
+  canvas.focus();
+
   if (gameRunning) return;
 
   if (gameOver) {
@@ -82,6 +88,8 @@ function endGame() {
 }
 
 function update() {
+  applyQueuedDirection();
+
   dx = nextDx;
   dy = nextDy;
 
@@ -90,16 +98,23 @@ function update() {
     y: snake[0].y + dy
   };
 
-  if (hitWall(head) || hitSelf(head)) {
+  const willEatFood = head.x === food.x && head.y === food.y;
+
+  if (hitWall(head) || hitSelf(head, willEatFood)) {
     endGame();
     return;
   }
 
   snake.unshift(head);
 
-  if (head.x === food.x && head.y === food.y) {
+  if (willEatFood) {
     score += 10;
     scoreEl.textContent = score;
+
+    if (snake.length >= maxSnakeLength) {
+      snake.pop();
+    }
+
     food = createFood();
   } else {
     snake.pop();
@@ -141,56 +156,105 @@ function drawGrid() {
 }
 
 function createFood() {
-  let newFood;
+  const emptyCells = [];
 
-  do {
-    newFood = {
-      x: Math.floor(Math.random() * tileCount),
-      y: Math.floor(Math.random() * tileCount)
-    };
-  } while (snake && snake.some((part) => part.x === newFood.x && part.y === newFood.y));
+  for (let y = 0; y < tileCount; y += 1) {
+    for (let x = 0; x < tileCount; x += 1) {
+      const occupied = snake && snake.some((part) => part.x === x && part.y === y);
 
-  return newFood;
+      if (!occupied) {
+        emptyCells.push({ x, y });
+      }
+    }
+  }
+
+  if (emptyCells.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  return emptyCells[Math.floor(Math.random() * emptyCells.length)];
 }
 
 function hitWall(head) {
   return head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount;
 }
 
-function hitSelf(head) {
-  return snake.some((part) => part.x === head.x && part.y === head.y);
+function hitSelf(head, willEatFood) {
+  const bodyToCheck = willEatFood ? snake : snake.slice(0, -1);
+  return bodyToCheck.some((part) => part.x === head.x && part.y === head.y);
 }
 
 function changeDirection(direction) {
   if (!gameRunning) return;
 
-  if (direction === "up" && dy !== 1) {
-    nextDx = 0;
-    nextDy = -1;
-  }
+  const requested = {
+    up: { x: 0, y: -1 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 }
+  }[direction];
 
-  if (direction === "down" && dy !== -1) {
-    nextDx = 0;
-    nextDy = 1;
-  }
+  if (!requested) return;
 
-  if (direction === "left" && dx !== 1) {
-    nextDx = -1;
-    nextDy = 0;
-  }
+  const lastDirection = directionQueue.length
+    ? directionQueue[directionQueue.length - 1]
+    : { x: nextDx, y: nextDy };
 
-  if (direction === "right" && dx !== -1) {
-    nextDx = 1;
-    nextDy = 0;
+  const isSameDirection = requested.x === lastDirection.x && requested.y === lastDirection.y;
+  if (isSameDirection) return;
+
+  const isReverseDirection = requested.x === -lastDirection.x && requested.y === -lastDirection.y;
+  if (isReverseDirection) return;
+
+  directionQueue.push(requested);
+
+  if (directionQueue.length > 2) {
+    directionQueue.shift();
   }
 }
 
+function applyQueuedDirection() {
+  if (!directionQueue.length) return;
+
+  const nextDirection = directionQueue.shift();
+
+  nextDx = nextDirection.x;
+  nextDy = nextDirection.y;
+}
+
 document.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowUp") changeDirection("up");
-  if (event.key === "ArrowDown") changeDirection("down");
-  if (event.key === "ArrowLeft") changeDirection("left");
-  if (event.key === "ArrowRight") changeDirection("right");
-  if (event.key === " ") startGame();
+  const code = event.code;
+  const key = event.key.toLowerCase();
+
+  const controls = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    KeyW: "up",
+    KeyS: "down",
+    KeyA: "left",
+    KeyD: "right"
+  };
+
+  const fallbackControls = {
+    w: "up",
+    s: "down",
+    a: "left",
+    d: "right"
+  };
+
+  const direction = controls[code] || fallbackControls[key];
+
+  if (direction) {
+    event.preventDefault();
+    changeDirection(direction);
+  }
+
+  if (code === "Space" || key === " ") {
+    event.preventDefault();
+    startGame();
+  }
 });
 
 document.querySelectorAll(".mobile-controls button").forEach((button) => {

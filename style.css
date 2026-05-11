@@ -97,3 +97,9 @@ button:hover {
     display: block;
   }
 }
+
+
+canvas:focus {
+  outline: 2px solid #b6ff00;
+  outline-offset: 4px;
+}
